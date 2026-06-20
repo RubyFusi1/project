@@ -1,0 +1,19 @@
+const int switchPin = 6;
+const int ledPin = 13;        // built-in LED on the Uno
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(switchPin, INPUT_PULLUP);   // built-in pull-up, no resistor needed
+  pinMode(ledPin, OUTPUT);
+}
+
+void loop() {
+  if (digitalRead(switchPin) == LOW) {   // switch closed = ON
+    Serial.println("ON");
+    digitalWrite(ledPin, HIGH);          // LED on
+  } else {
+    Serial.println("OFF");
+    digitalWrite(ledPin, LOW);           // LED off
+  }
+  delay(300);
+}
