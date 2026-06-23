@@ -1,0 +1,44 @@
+// Threshold project — Touch sensor identifier
+// Touch one sensor at a time and the Serial Monitor
+// will tell you which pin it's connected to.
+
+const int touchPins[] = {4, 5, 6, 7, 8, 9, 10, 16};
+const int numPins = sizeof(touchPins) / sizeof(touchPins[0]);
+
+// remembers the last state of each pin so we only print on change
+int lastState[numPins];
+
+void setup() {
+  Serial.begin(9600);
+  while (!Serial) {
+    ; // wait for serial (needed on Micro)
+  }
+
+  for (int i = 0; i < numPins; i++) {
+    pinMode(touchPins[i], INPUT);
+    lastState[i] = LOW;
+  }
+
+  Serial.println("=== Touch Sensor Identifier ===");
+  Serial.println("Touch one sensor at a time...");
+  Serial.println();
+}
+
+void loop() {
+  for (int i = 0; i < numPins; i++) {
+    int reading = digitalRead(touchPins[i]);
+
+    // only react when the state changes
+    if (reading != lastState[i]) {
+      if (reading == HIGH) {
+        Serial.print(">>> TOUCHED  -> Pin ");
+        Serial.println(touchPins[i]);
+      } else {
+        Serial.print("    released -> Pin ");
+        Serial.println(touchPins[i]);
+      }
+      lastState[i] = reading;
+    }
+  }
+  delay(20); // small debounce
+}
