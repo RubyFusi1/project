@@ -1,0 +1,36 @@
+// Threshold — I2C SLAVE (Micro)
+// Reads 8 touch sensors, packs them into one byte,
+// and sends that byte to the master when asked.
+
+#include <Wire.h>
+
+const int MY_ADDRESS = 8;
+const int touchPins[] = {4, 5, 6, 7, 8, 9, 10, 16};
+const int numPins = sizeof(touchPins) / sizeof(touchPins[0]);
+
+volatile byte touchState = 0;  // each bit = one sensor (1 = touched)
+
+void setup() {
+  for (int i = 0; i < numPins; i++) {
+    pinMode(touchPins[i], INPUT);
+  }
+  Wire.begin(MY_ADDRESS);
+  Wire.onRequest(requestEvent);  // run this when master asks for data
+}
+
+void loop() {
+  // read all sensors and pack into one byte
+  byte state = 0;
+  for (int i = 0; i < numPins; i++) {
+    if (digitalRead(touchPins[i]) == HIGH) {
+      state |= (1 << i);   // set bit i if sensor i is touched
+    }
+  }
+  touchState = state;      // store for the master to grab
+  delay(20);               // small debounce
+}
+
+// keep this SHORT — just send the byte
+void requestEvent() {
+  Wire.write(touchState);
+}
