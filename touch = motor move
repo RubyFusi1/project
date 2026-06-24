@@ -1,0 +1,50 @@
+// Threshold — MASTER (center Uno)
+// Any touch sensor touched -> run Motor 1 on LEFT and Motor 1 on RIGHT.
+// Release all -> both stop.
+
+#include <Wire.h>
+
+const int MICRO_ADDRESS = 8;   // touch sensors
+const int LEFT_ADDRESS  = 9;   // left motors
+const int RIGHT_ADDRESS = 10;  // right motors
+
+byte lastState = 0;
+
+void setup() {
+  Wire.begin();
+  Serial.begin(9600);
+  Serial.println("=== Any touch -> Motor 1 runs on both sides ===");
+}
+
+void loop() {
+  // ask the Micro for its touch byte
+  Wire.requestFrom(MICRO_ADDRESS, 1);
+
+  if (Wire.available()) {
+    byte state = Wire.read();
+
+    // any sensor touched at all?  -> command = bit 0 set (Motor 1)
+    // nothing touched             -> command = 0 (all stop)
+    byte command = (state != 0) ? 0b00000001 : 0b00000000;
+
+    // send to LEFT motor slave
+    Wire.beginTransmission(LEFT_ADDRESS);
+    Wire.write(command);
+    Wire.endTransmission();
+
+    // send to RIGHT motor slave
+    Wire.beginTransmission(RIGHT_ADDRESS);
+    Wire.write(command);
+    Wire.endTransmission();
+
+    // print on change
+    if (state != 0 && lastState == 0) {
+      Serial.println(">>> TOUCHED  -> Left Motor 1 + Right Motor 1 RUN");
+    } else if (state == 0 && lastState != 0) {
+      Serial.println("    released -> both motors STOP");
+    }
+    lastState = state;
+  }
+
+  delay(30);
+}
