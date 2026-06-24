@@ -1,0 +1,63 @@
+// Threshold — MASTER (center Uno)
+// 8 switches on pins 2-9. When ANY switch CHANGES state,
+// pulse Motor 1 on the LEFT (9) and RIGHT (10) for a moment.
+
+#include <Wire.h>
+
+const int LEFT_ADDRESS  = 9;
+const int RIGHT_ADDRESS = 10;
+
+const int switchPins[] = {2, 3, 4, 5, 6, 7, 8, 9};
+const int numSwitches = sizeof(switchPins) / sizeof(switchPins[0]);
+
+bool lastReading[8];          // remembers each switch's last state
+const unsigned long RUN_TIME = 500;  // how long Motor 1 runs, in ms
+
+void setup() {
+  Wire.begin();
+  Serial.begin(9600);
+
+  // switches wired to GND, using internal pullups
+  for (int i = 0; i < numSwitches; i++) {
+    pinMode(switchPins[i], INPUT_PULLUP);
+    lastReading[i] = digitalRead(switchPins[i]);
+  }
+
+  Serial.println("=== Flip any switch -> Motor 1 pulses on both sides ===");
+}
+
+void sendCommand(byte command) {
+  Wire.beginTransmission(LEFT_ADDRESS);
+  Wire.write(command);
+  Wire.endTransmission();
+
+  Wire.beginTransmission(RIGHT_ADDRESS);
+  Wire.write(command);
+  Wire.endTransmission();
+}
+
+void loop() {
+  bool changed = false;
+
+  // check every switch for a change
+  for (int i = 0; i < numSwitches; i++) {
+    bool reading = digitalRead(switchPins[i]);
+    if (reading != lastReading[i]) {
+      changed = true;
+      Serial.print(">>> Switch on pin ");
+      Serial.print(switchPins[i]);
+      Serial.println(" CHANGED");
+    }
+    lastReading[i] = reading;
+  }
+
+  // if anything changed, pulse Motor 1 on both sides
+  if (changed) {
+    sendCommand(0b00000001);   // Motor 1 ON
+    delay(RUN_TIME);
+    sendCommand(0b00000000);   // all OFF
+    Serial.println("    Motor 1 pulse done");
+  }
+
+  delay(20);  // debounce
+}
