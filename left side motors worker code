@@ -1,0 +1,59 @@
+// Threshold — LEFT-side motor SLAVE (Uno, I2C address 9)
+// Receives 1 byte from the master. Each bit = one motor:
+//   bit set  -> that motor runs FORWARD
+//   bit clear-> that motor STOPS
+
+#include <Wire.h>
+
+const int MY_ADDRESS = 9;   // <-- LEFT side uses address 9
+
+int motorPins[8][2] = {
+  {13, 12},  // Motor 1
+  {11, 10},  // Motor 2
+  {9, 8},    // Motor 3
+  {7, 6},    // Motor 4
+  {5, 4},    // Motor 5
+  {3, 2},    // Motor 6
+  {A0, A1},  // Motor 7
+  {A2, A3}   // Motor 8
+};
+const int numMotors = sizeof(motorPins) / sizeof(motorPins[0]);
+
+volatile byte motorCommand = 0;
+
+void setup() {
+  for (int i = 0; i < numMotors; i++) {
+    pinMode(motorPins[i][0], OUTPUT);
+    pinMode(motorPins[i][1], OUTPUT);
+    motorStop(i);
+  }
+  Wire.begin(MY_ADDRESS);
+  Wire.onReceive(receiveEvent);
+}
+
+void motorForward(int i) {
+  digitalWrite(motorPins[i][0], HIGH);
+  digitalWrite(motorPins[i][1], LOW);
+}
+
+void motorStop(int i) {
+  digitalWrite(motorPins[i][0], LOW);
+  digitalWrite(motorPins[i][1], LOW);
+}
+
+void loop() {
+  for (int i = 0; i < numMotors; i++) {
+    if (motorCommand & (1 << i)) {
+      motorForward(i);
+    } else {
+      motorStop(i);
+    }
+  }
+  delay(20);
+}
+
+void receiveEvent(int howMany) {
+  while (Wire.available()) {
+    motorCommand = Wire.read();
+  }
+}
