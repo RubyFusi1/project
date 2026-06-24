@@ -1,0 +1,130 @@
+// Threshold — MASTER (center Uno)
+// Switches on pins 2-9. On ANY switch change:
+//   - pulse Motor 1 on LEFT (9) and RIGHT (10)   [same as before]
+//   - light up the LED-driver channels one by one in sequence
+//
+// LED driver (TLC5947, bit-banged):  LAT=12, CLK=11, DIN=10
+// Used channels: 0,1,2,3,5,6,7,8,10,11,23
+
+#include <Wire.h>
+
+const int LEFT_ADDRESS  = 9;
+const int RIGHT_ADDRESS = 10;
+
+// ---- switches ----
+const int switchPins[] = {2, 3, 4, 5, 6, 7, 8, 9};
+const int numSwitches = sizeof(switchPins) / sizeof(switchPins[0]);
+bool lastReading[8];
+
+// ---- motor timing ----
+const unsigned long RUN_TIME = 500;   // Motor 1 pulse length (ms)
+
+// ---- LED driver pins ----
+const int LAT = 12;
+const int CLK = 11;
+const int DIN = 10;
+
+// the channels we want to light, in order
+const int lightSeq[] = {0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 23};
+const int numLights = sizeof(lightSeq) / sizeof(lightSeq[0]);
+const unsigned long STEP_TIME = 200;  // time between each light (ms)
+
+// TLC5947 = 24 channels, 12-bit each
+uint16_t pwm[24];
+
+void setup() {
+  Wire.begin();
+  Serial.begin(9600);
+
+  // switches to GND, internal pullups
+  for (int i = 0; i < numSwitches; i++) {
+    pinMode(switchPins[i], INPUT_PULLUP);
+    lastReading[i] = digitalRead(switchPins[i]);
+  }
+
+  // LED driver pins
+  pinMode(LAT, OUTPUT);
+  pinMode(CLK, OUTPUT);
+  pinMode(DIN, OUTPUT);
+  digitalWrite(LAT, LOW);
+  digitalWrite(CLK, LOW);
+
+  clearLights();   // all off to start
+
+  Serial.println("=== Flip a switch -> Motor 1 pulses + lights chase ===");
+}
+
+// ---- TLC5947 helpers ----
+void writeTLC() {
+  digitalWrite(LAT, LOW);
+  // shift out channel 23 down to 0, 12 bits each, MSB first
+  for (int ch = 23; ch >= 0; ch--) {
+    for (int b = 11; b >= 0; b--) {
+      digitalWrite(CLK, LOW);
+      digitalWrite(DIN, (pwm[ch] >> b) & 0x01);
+      digitalWrite(CLK, HIGH);
+    }
+  }
+  digitalWrite(CLK, LOW);
+  digitalWrite(LAT, HIGH);   // latch
+  digitalWrite(LAT, LOW);
+}
+
+void clearLights() {
+  for (int i = 0; i < 24; i++) pwm[i] = 0;
+  writeTLC();
+}
+
+void setLight(int ch, uint16_t value) {
+  if (ch >= 0 && ch < 24) pwm[ch] = value;
+}
+
+// ---- motor helper ----
+void sendMotor(byte command) {
+  Wire.beginTransmission(LEFT_ADDRESS);
+  Wire.write(command);
+  Wire.endTransmission();
+
+  Wire.beginTransmission(RIGHT_ADDRESS);
+  Wire.write(command);
+  Wire.endTransmission();
+}
+
+void loop() {
+  bool changed = false;
+
+  for (int i = 0; i < numSwitches; i++) {
+    bool reading = digitalRead(switchPins[i]);
+    if (reading != lastReading[i]) {
+      changed = true;
+      Serial.print(">>> Switch on pin ");
+      Serial.print(switchPins[i]);
+      Serial.println(" CHANGED");
+    }
+    lastReading[i] = reading;
+  }
+
+  if (changed) {
+    // 1) start Motor 1 on both sides
+    sendMotor(0b00000001);
+
+    // 2) light each channel in sequence (they build up, staying on)
+    clearLights();
+    for (int i = 0; i < numLights; i++) {
+      setLight(lightSeq[i], 4095);   // 4095 = full brightness
+      writeTLC();
+      Serial.print("    light channel ");
+      Serial.print(lightSeq[i]);
+      Serial.println(" ON");
+      delay(STEP_TIME);
+    }
+
+    // 3) stop Motor 1
+    sendMotor(0b00000000);
+
+    Serial.println("    sequence done");
+    // lights left ON; next switch change restarts the chase
+  }
+
+  delay(20);
+}
