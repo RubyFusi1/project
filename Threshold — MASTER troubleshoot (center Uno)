@@ -1,0 +1,41 @@
+// Threshold — MASTER troubleshoot (center Uno)
+// Just reads the Micro (8) and prints which sensors are touched.
+// No motors. For testing the touch sensors only.
+
+#include <Wire.h>
+
+const int MICRO_ADDRESS = 8;
+const int numPins = 8;
+const int touchPins[] = {4, 5, 6, 7, 8, 9, 10, 16};
+
+byte lastState = 0;
+
+void setup() {
+  Wire.begin();
+  Serial.begin(9600);
+  Serial.println("=== Touch test — touch a sensor ===");
+}
+
+void loop() {
+  Wire.requestFrom(MICRO_ADDRESS, 1);
+
+  if (Wire.available()) {
+    byte state = Wire.read();
+
+    for (int i = 0; i < numPins; i++) {
+      bool nowTouched = state     & (1 << i);
+      bool wasTouched = lastState & (1 << i);
+
+      if (nowTouched && !wasTouched) {
+        Serial.print(">>> TOUCHED  -> sensor on Micro pin ");
+        Serial.println(touchPins[i]);
+      } else if (!nowTouched && wasTouched) {
+        Serial.print("    released -> sensor on Micro pin ");
+        Serial.println(touchPins[i]);
+      }
+    }
+    lastState = state;
+  }
+
+  delay(30);
+}
